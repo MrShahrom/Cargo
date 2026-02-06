@@ -45,12 +45,12 @@ export default function Warehouse() {
     };
 
     const handleDelete = async (id) => {
-        if (!window.confirm('Are you sure you want to delete this package?')) return;
+        if (!window.confirm('Are you sure you want to delete this parcel?')) return;
         try {
             await api.delete(`/packages/${id}`);
             fetchPackages();
         } catch (error) {
-            alert('Failed to delete package');
+            alert('Failed to delete parcel');
         }
     };
 
@@ -77,17 +77,31 @@ export default function Warehouse() {
 
             if (isEditing) {
                 await api.put(`/packages/${formData.id}`, payload);
-                setSuccessMsg(`Package ${formData.trackingCode} updated!`);
+                setSuccessMsg(`Parcel ${formData.trackingCode} updated!`);
                 setIsEditing(false);
             } else {
                 await api.post('/packages', payload);
-                setSuccessMsg(`Package ${formData.trackingCode} received!`);
+                setSuccessMsg(`Parcel ${formData.trackingCode} received!`);
             }
 
             setFormData({ id: null, trackingCode: '', clientHumanId: '', weight: '', volume: '', price: '' });
             fetchPackages();
         } catch (error) {
-            alert(isEditing ? 'Failed to update package.' : 'Failed to register package. Check Client ID or Tracking Code.');
+            console.error(error);
+            let msg = isEditing ? 'Failed to update package.' : 'Failed to register package.';
+
+            if (error.response) {
+                // Backend returned a response
+                if (typeof error.response.data === 'string') {
+                    msg += ` ${error.response.data}`;
+                } else if (error.response.data?.title) {
+                    msg += ` ${error.response.data.title}`;
+                } else if (error.response.data?.message) {
+                    msg += ` ${error.response.data.message}`;
+                }
+            }
+
+            alert(msg);
         } finally {
             setLoading(false);
         }
@@ -97,8 +111,8 @@ export default function Warehouse() {
         <div style={{ display: 'flex', gap: '2rem', flexWrap: 'wrap' }}>
             <div style={{ flex: '1', minWidth: '350px' }}>
                 <div className="page-header">
-                    <h1 className="page-title">{isEditing ? 'Edit Package' : 'Warehouse Scan'}</h1>
-                    <p style={{ color: 'var(--text-muted)' }}>{isEditing ? 'Update package details.' : 'Receive arriving packages.'}</p>
+                    <h1 className="page-title">{isEditing ? 'Edit Parcel' : 'Parcel Receipt'}</h1>
+                    <p style={{ color: 'var(--text-muted)' }}>{isEditing ? 'Update parcel details.' : 'Receive arriving parcels (Step 1).'}</p>
                 </div>
 
                 <div className="glass-panel">
@@ -185,7 +199,7 @@ export default function Warehouse() {
                                 </button>
                             )}
                             <button type="submit" className="btn btn-primary" style={{ flex: 1, justifyContent: 'center' }} disabled={loading}>
-                                {loading ? 'Processing...' : (isEditing ? 'Update Package' : 'Receive Package')}
+                                {loading ? 'Processing...' : (isEditing ? 'Update Parcel' : 'Receive Parcel')}
                             </button>
                         </div>
                     </form>
@@ -198,7 +212,7 @@ export default function Warehouse() {
                 </div>
                 <div className="glass-panel" style={{ padding: '0' }}>
                     {recentPackages.length === 0 ? (
-                        <p style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>No recent packages.</p>
+                        <p style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>No recent parcels.</p>
                     ) : (
                         <div style={{ maxHeight: '600px', overflowY: 'auto' }}>
                             {recentPackages.map(pkg => (

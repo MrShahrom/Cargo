@@ -15,7 +15,7 @@ public class ShipmentService
         _notificationService = notificationService;
     }
 
-    public async Task<Shipment> CreateShipmentAsync(string name)
+    public async Task<Shipment> CreateShipmentAsync(string name, List<Guid> packageIds)
     {
         var shipment = new Shipment
         {
@@ -24,6 +24,23 @@ public class ShipmentService
             Status = ShipmentStatus.Planning,
             CreatedAt = DateTime.UtcNow
         };
+
+        if (packageIds != null && packageIds.Any())
+        {
+            var packages = await _context.Packages
+                .Where(p => packageIds.Contains(p.Id) && p.ShipmentId == null)
+                .ToListAsync();
+
+            foreach (var pkg in packages)
+            {
+                pkg.ShipmentId = shipment.Id;
+            }
+
+            shipment.Packages = packages;
+            shipment.TotalWeight = packages.Sum(p => p.Weight);
+            shipment.TotalVolume = packages.Sum(p => p.Volume);
+        }
+
         _context.Shipments.Add(shipment);
         await _context.SaveChangesAsync();
         return shipment;
@@ -35,8 +52,37 @@ public class ShipmentService
         if (package == null) throw new Exception("Package not found");
 
         package.ShipmentId = shipmentId;
-        // Optionally update package status to match shipment or stay InWarehouse until Shipment departs
         await _context.SaveChangesAsync();
+        await RecalculateTotalsAsync(shipmentId);
+    }
+
+    public async Task AddPackageByTrackingCodeAsync(Guid shipmentId, string trackingCode)
+    {
+        var package = await _context.Packages.FirstOrDefaultAsync(p => p.TrackingCode == trackingCode);
+        if (package == null) throw new Exception("Package with this tracking code not found");
+
+        if (package.ShipmentId.HasValue && package.ShipmentId != shipmentId)
+        {
+             throw new Exception("Package is already in another shipment");
+        }
+
+        package.ShipmentId = shipmentId;
+        await _context.SaveChangesAsync();
+        await RecalculateTotalsAsync(shipmentId);
+    }
+
+    public async Task RecalculateTotalsAsync(Guid shipmentId)
+    {
+        var shipment = await _context.Shipments
+            .Include(s => s.Packages)
+            .FirstOrDefaultAsync(s => s.Id == shipmentId);
+
+        if (shipment != null)
+        {
+            shipment.TotalWeight = shipment.Packages.Sum(p => p.Weight);
+            shipment.TotalVolume = shipment.Packages.Sum(p => p.Volume);
+            await _context.SaveChangesAsync();
+        }
     }
 
     public async Task UpdateStatusAsync(Guid shipmentId, ShipmentStatus status)
@@ -58,6 +104,16 @@ public class ShipmentService
             _ => PackageStatus.InWarehouse
         };
 
+        if (status == ShipmentStatus.EnRoute && shipment.DepartureDate == null)
+        {
+            shipment.DepartureDate = DateTime.UtcNow;
+        }
+
+        if (status == ShipmentStatus.Arrived && shipment.ArrivalDate == null)
+        {
+            shipment.ArrivalDate = DateTime.UtcNow;
+        }
+
         foreach (var pkg in shipment.Packages)
         {
             pkg.Status = pkgStatus;
@@ -67,13 +123,54 @@ public class ShipmentService
         await _context.SaveChangesAsync();
     }
 
-    public async Task<Shipment?> UpdateShipmentAsync(Guid id, string name)
+    public async Task<Shipment?> UpdateShipmentAsync(Guid id, string name, List<Guid>? packageIds = null)
     {
-        var shipment = await _context.Shipments.FindAsync(id);
+        var shipment = await _context.Shipments
+            .Include(s => s.Packages)
+            .FirstOrDefaultAsync(s => s.Id == id);
+            
         if (shipment == null) return null;
 
         shipment.Name = name;
+
+        if (packageIds != null)
+        {
+            // 1. Identify packages to remove
+            var packagesToRemove = shipment.Packages.Where(p => !packageIds.Contains(p.Id)).ToList();
+            foreach (var pkg in packagesToRemove)
+            {
+                pkg.ShipmentId = null; 
+            }
+
+            // 2. Identify packages to add
+            // Only add packages that are NOT currently in this shipment.
+            // Note: need to fetch them.
+            // Also ensure we don't steal packages from other shipments unless intended. 
+            // For now, allow stealing or require them to be free?
+            // "Available" typically means ShipmentId is null.
+            // Let's assume the UI sends valid IDs.
+            
+            var existingIds = shipment.Packages.Select(p => p.Id).ToList();
+            var newIds = packageIds.Where(id => !existingIds.Contains(id)).ToList();
+
+            if (newIds.Any())
+            {
+                var newPackages = await _context.Packages
+                    .Where(p => newIds.Contains(p.Id))
+                    .ToListAsync();
+
+                foreach (var pkg in newPackages)
+                {
+                    // Optional safety: if (pkg.ShipmentId != null) throw... 
+                    // But maybe user wants to move? Let's allow overwrite for flexibility.
+                    pkg.ShipmentId = shipment.Id;
+                }
+            }
+        }
+
         await _context.SaveChangesAsync();
+        await RecalculateTotalsAsync(id);
+        
         return shipment;
     }
 

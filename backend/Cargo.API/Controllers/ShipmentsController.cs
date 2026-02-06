@@ -20,8 +20,8 @@ public class ShipmentsController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<Shipment>> Create(CreateShipmentDto dto)
     {
-        var shipment = await _shipmentService.CreateShipmentAsync(dto.Name);
-        return Ok(shipment);
+        var shipment = await _shipmentService.CreateShipmentAsync(dto.Name, dto.PackageIds);
+        return CreatedAtAction(nameof(GetAll), new { id = shipment.Id }, shipment);
     }
 
     [HttpPost("{id}/add-package")]
@@ -30,6 +30,20 @@ public class ShipmentsController : ControllerBase
         try
         {
             await _shipmentService.AddPackageToShipmentAsync(id, packageId);
+            return Ok();
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(ex.Message);
+        }
+    }
+
+    [HttpPost("{id}/add-package-by-code")]
+    public async Task<IActionResult> AddPackageByCode(Guid id, [FromBody] string trackingCode)
+    {
+        try
+        {
+            await _shipmentService.AddPackageByTrackingCodeAsync(id, trackingCode);
             return Ok();
         }
         catch (Exception ex)
@@ -55,7 +69,7 @@ public class ShipmentsController : ControllerBase
     [HttpPut("{id}")]
     public async Task<ActionResult<Shipment>> Update(Guid id, UpdateShipmentDto dto)
     {
-        var shipment = await _shipmentService.UpdateShipmentAsync(id, dto.Name);
+        var shipment = await _shipmentService.UpdateShipmentAsync(id, dto.Name, dto.PackageIds);
         if (shipment == null) return NotFound();
         return Ok(shipment);
     }
@@ -79,9 +93,11 @@ public class ShipmentsController : ControllerBase
 public class CreateShipmentDto
 {
     public string Name { get; set; } = string.Empty;
+    public List<Guid> PackageIds { get; set; } = new List<Guid>();
 }
 
 public class UpdateShipmentDto
 {
     public string Name { get; set; } = string.Empty;
+    public List<Guid>? PackageIds { get; set; } // Optional: if null, don't change packages
 }

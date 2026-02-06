@@ -13,6 +13,12 @@ public class Shipment
 
     public ICollection<Package> Packages { get; set; } = new List<Package>();
 
+    public DateTime? DepartureDate { get; set; }
+    public DateTime? ArrivalDate { get; set; }
+    
+    public double TotalWeight { get; set; }
+    public double TotalVolume { get; set; }
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }
 

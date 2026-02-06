@@ -7,10 +7,17 @@ namespace Cargo.API.Services;
 public class PackageService
 {
     private readonly AppDbContext _context;
+    // Using IServiceProvider or similar to avoid circular dependency if ShipmentService depends on PackageService in future, 
+    // but effectively here we can just inject it if no cycle exists.
+    // However, checking program.cs: all are scoped. 
+    // If ShipmentService depends on PackageService (it doesn't), cycle exists.
+    // Let's check: ShipmentService(AppDbContext, NotificationService). Safe.
+    private readonly ShipmentService _shipmentService;
 
-    public PackageService(AppDbContext context)
+    public PackageService(AppDbContext context, ShipmentService shipmentService)
     {
         _context = context;
+        _shipmentService = shipmentService;
     }
 
     public async Task<Package> CreatePackageAsync(string trackingCode, Guid clientId, double weight, double volume, decimal price)
@@ -61,11 +68,19 @@ public class PackageService
             package.TrackingCode = trackingCode;
         }
 
+        bool dimensionsChanged = Math.Abs(package.Weight - weight) > 0.001 || Math.Abs(package.Volume - volume) > 0.001;
+
         package.Weight = weight;
         package.Volume = volume;
         package.Price = price;
         
         await _context.SaveChangesAsync();
+
+        if (dimensionsChanged && package.ShipmentId.HasValue)
+        {
+            await _shipmentService.RecalculateTotalsAsync(package.ShipmentId.Value);
+        }
+
         return package;
     }
 

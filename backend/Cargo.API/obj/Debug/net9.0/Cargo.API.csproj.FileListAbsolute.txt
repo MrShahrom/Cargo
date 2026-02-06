@@ -137,3 +137,4 @@
 /Users/shahrom/Cargo/backend/Cargo.API/bin/Debug/net9.0/Microsoft.IdentityModel.Protocols.OpenIdConnect.dll
 /Users/shahrom/Cargo/backend/Cargo.API/bin/Debug/net9.0/Microsoft.IdentityModel.Tokens.dll
 /Users/shahrom/Cargo/backend/Cargo.API/bin/Debug/net9.0/System.IdentityModel.Tokens.Jwt.dll
+/Users/shahrom/Cargo/backend/Cargo.API/obj/Debug/net9.0/Cargo.API.sourcelink.json

@@ -3,6 +3,7 @@ using System;
 using Cargo.API.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Cargo.API.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260205093821_AddPackageItems")]
+    partial class AddPackageItems
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -104,6 +107,29 @@ namespace Cargo.API.Migrations
                     b.ToTable("Packages");
                 });
 
+            modelBuilder.Entity("Cargo.API.Entities.PackageItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("PackageId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("TrackingCode")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PackageId");
+
+                    b.ToTable("PackageItems");
+                });
+
             modelBuilder.Entity("Cargo.API.Entities.Shipment", b =>
                 {
                     b.Property<Guid>("Id")
@@ -125,12 +151,6 @@ namespace Cargo.API.Migrations
 
                     b.Property<int>("Status")
                         .HasColumnType("integer");
-
-                    b.Property<double>("TotalVolume")
-                        .HasColumnType("double precision");
-
-                    b.Property<double>("TotalWeight")
-                        .HasColumnType("double precision");
 
                     b.HasKey("Id");
 
@@ -178,6 +198,22 @@ namespace Cargo.API.Migrations
                     b.Navigation("Client");
 
                     b.Navigation("Shipment");
+                });
+
+            modelBuilder.Entity("Cargo.API.Entities.PackageItem", b =>
+                {
+                    b.HasOne("Cargo.API.Entities.Package", "Package")
+                        .WithMany("Items")
+                        .HasForeignKey("PackageId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Package");
+                });
+
+            modelBuilder.Entity("Cargo.API.Entities.Package", b =>
+                {
+                    b.Navigation("Items");
                 });
 
             modelBuilder.Entity("Cargo.API.Entities.Shipment", b =>
